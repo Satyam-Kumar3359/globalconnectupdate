@@ -12,6 +12,7 @@ import Loader from '../../components/Loader/loader';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 
+
 const Feeds = () => {
 
   const [personalData, setPersonalData] = useState(null);
@@ -19,30 +20,47 @@ const Feeds = () => {
   const [loading, setLoading] = useState(true); // Add loading state
   const [addPostModal, setAddPostModal] = useState(false);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true); // Set loading to true at start
-      
-      const [userData, postData] = await Promise.all([
-        axios.get('http://localhost:4000/api/auth/self', { withCredentials: true }),
-        axios.get('http://localhost:4000/api/post/getAllPost')
-      ]);
-      
-      // FIXED: This was the main bug - you wrote personalData.data.user instead of userData.data.user
-      setPersonalData(userData.data.user); // CORRECTED
-      localStorage.setItem('userInfo', JSON.stringify(userData.data.user));  
-      setPost(postData.data.posts);
+  const [profileViews, setProfileViews] = useState(0);
+const [postImpressions, setPostImpressions] = useState(0);
 
-      console.log('Personal Data:', userData.data.user); // Debug log
-      console.log('Posts Data:', postData.data.posts); // Debug log
+const fetchData = async () => {
+  try {
+    setLoading(true);
 
-    } catch (err) {
-      console.error('Fetch Error:', err); // Better error logging
-      toast.error(err?.response?.data?.error || 'Failed to fetch data');
-    } finally {
-      setLoading(false); // Set loading to false when done
-    }
+    const [userData, postData] = await Promise.all([
+      axios.get('http://localhost:4000/api/auth/self', { withCredentials: true }),
+      axios.get('http://localhost:4000/api/post/getAllPost')
+    ]);
+
+    const user = userData.data.user;
+    const posts = postData.data.posts;
+
+    setPersonalData(user);
+    localStorage.setItem('userInfo', JSON.stringify(user));  
+    setPost(posts);
+
+    // ✅ Count friends (profile viewers)
+    setProfileViews(user.friends?.length || 0);
+
+    // ✅ Count total likes + comments for logged-in user's posts
+    const myPosts = posts.filter(p => 
+      p.user === user._id || p.user?._id === user._id
+    );
+    const impressions = myPosts.reduce((total, p) => {
+      const likeCount = p.likes?.length || 0;
+      const commentCount = p.comments || 0; // already stored as a number
+      return total + likeCount + commentCount;
+    }, 0);
+    setPostImpressions(impressions);
+
+  } catch (err) {
+    console.error('Fetch Error:', err);
+    toast.error(err?.response?.data?.error || 'Failed to fetch data');
+  } finally {
+    setLoading(false);
   }
+};
+
 
   useEffect(() => {
     fetchData()
@@ -73,11 +91,11 @@ const Feeds = () => {
           <Card padding={1}>
             <div className=" w-full flex justify-between">
               <div>Profile Viewers</div>
-              <div className="text-blue-900">23</div>
+              <div className="text-blue-900">{profileViews}</div>
             </div>
             <div className=" w-full flex justify-between">
               <div>Post Impressions</div>
-              <div className="text-blue-900">90</div>
+              <div className="text-blue-900">{postImpressions}</div>
             </div>
           </Card>
         </div>
